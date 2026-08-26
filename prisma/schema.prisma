@@ -1,0 +1,99 @@
+// StoreQL — Prisma schema (MongoDB provider)
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "mongodb"
+  url      = env("MONGODB_URL")
+}
+
+model User {
+  id              String   @id @default(auto()) @map("_id") @db.ObjectId
+  firebaseUid     String   @unique
+  name            String?
+  email           String   @unique
+  profileImageUrl String?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  spaces  Space[]
+  links   Link[]
+  matters Matter[]
+  tags    Tag[]
+}
+
+model Space {
+  id            String   @id @default(auto()) @map("_id") @db.ObjectId
+  userId        String   @db.ObjectId
+  user          User     @relation(fields: [userId], references: [id])
+  name          String
+  description   String?
+  icon          String?
+  coverImageUrl String?
+  color         String?
+  order         Int      @default(0)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  links   Link[]
+  matters Matter[]
+
+  @@index([userId, order])
+}
+
+model Link {
+  id             String   @id @default(auto()) @map("_id") @db.ObjectId
+  userId         String   @db.ObjectId
+  user           User     @relation(fields: [userId], references: [id])
+  spaceId        String?  @db.ObjectId
+  space          Space?   @relation(fields: [spaceId], references: [id])
+  url            String
+  title          String?
+  description    String?
+  domain         String?
+  faviconUrl     String?
+  thumbnailUrl   String?
+  source         String? // instagram | chrome | safari | whatsapp | telegram | youtube | tiktok | reddit | manual | share_sheet | other
+  metadataStatus String   @default("pending") // pending | success | failed
+  tagIds         String[] @db.ObjectId
+  tags           Tag[]    @relation(fields: [tagIds], references: [id])
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  matters Matter[]
+
+  @@index([userId, createdAt])
+  @@index([spaceId])
+  @@index([userId, domain])
+}
+
+model Matter {
+  id        String   @id @default(auto()) @map("_id") @db.ObjectId
+  userId    String   @db.ObjectId
+  user      User     @relation(fields: [userId], references: [id])
+  linkId    String   @db.ObjectId
+  link      Link     @relation(fields: [linkId], references: [id])
+  spaceId   String?  @db.ObjectId
+  space     Space?   @relation(fields: [spaceId], references: [id])
+  content   String
+  type      String   @default("note") // note | idea | reference | reminder | question | todo
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([userId, createdAt])
+  @@index([linkId])
+}
+
+model Tag {
+  id        String   @id @default(auto()) @map("_id") @db.ObjectId
+  userId    String   @db.ObjectId
+  user      User     @relation(fields: [userId], references: [id])
+  name      String
+  linkIds   String[] @db.ObjectId
+  links     Link[]   @relation(fields: [linkIds], references: [id])
+  createdAt DateTime @default(now())
+
+  @@unique([userId, name])
+}
