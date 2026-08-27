@@ -19,5 +19,6 @@ router.use(requireAuth);
 
 router.get('/signature', controller.getSignature);
 router.post('/profile-image', upload.single('image'), controller.uploadProfileImage);
+router.delete('/profile-image', controller.deleteProfileImage);
 
 module.exports = router;

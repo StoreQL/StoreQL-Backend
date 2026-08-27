@@ -12,20 +12,47 @@ const getSignature = asyncHandler(async (req, res) => {
 });
 
 // POST /api/uploads/profile-image (multipart, field name: "image")
-// Simpler path for small profile pictures — file never leaves the server's trust boundary.
 const uploadProfileImage = asyncHandler(async (req, res) => {
   if (!req.file) throw ApiError.badRequest('image file is required');
 
+  const userFolder = cloudinaryService.getUserFolder(req.user);
+
+  // If there was an existing image with a different public ID, remove it
+  const oldPublicId = cloudinaryService.extractPublicIdFromUrl(req.user.profileImageUrl);
+  if (oldPublicId && oldPublicId !== `${userFolder}/profile_picture`) {
+    await cloudinaryService.destroyImage(oldPublicId);
+  }
+
   const result = await cloudinaryService.uploadImage(req.file.buffer, {
-    folder: 'storeql/profiles',
-    publicId: req.user.id,
+    folder: userFolder,
+    publicId: 'profile_picture',
   });
 
   const user = await userService.updateProfile(req.user.id, {
     profileImageUrl: result.secure_url,
   });
 
-  res.json({ user });
+  res.json({ user, profileImageUrl: result.secure_url });
 });
 
-module.exports = { getSignature, uploadProfileImage };
+// DELETE /api/uploads/profile-image
+const deleteProfileImage = asyncHandler(async (req, res) => {
+  const userFolder = cloudinaryService.getUserFolder(req.user);
+  const oldPublicId = cloudinaryService.extractPublicIdFromUrl(req.user.profileImageUrl);
+
+  if (oldPublicId) {
+    await cloudinaryService.destroyImage(oldPublicId);
+  } else {
+    await cloudinaryService.destroyImage(`${userFolder}/profile_picture`);
+  }
+
+  const user = await userService.updateProfile(req.user.id, {
+    profileImageUrl: null,
+  });
+
+  res.json({ user, message: 'Profile picture removed successfully' });
+});
+
+module.exports = { getSignature, uploadProfileImage, deleteProfileImage };
+
+

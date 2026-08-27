@@ -29,6 +29,7 @@ const requireAuth = asyncHandler(async (req, res, next) => {
     firebaseUid: decoded.uid,
     email: decoded.email,
     name: decoded.name,
+    profileImageUrl: decoded.picture || decoded.photoURL || null,
   });
 
   req.user = user;
