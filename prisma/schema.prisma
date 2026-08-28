@@ -33,6 +33,7 @@ model Space {
   icon          String?
   coverImageUrl String?
   color         String?
+  category      String?  @default("General")
   order         Int      @default(0)
   createdAt     DateTime @default(now())
   updatedAt     DateTime @updatedAt

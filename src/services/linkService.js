@@ -14,7 +14,7 @@ function extractDomain(rawUrl) {
 async function getLinkById(userId, linkId) {
   const link = await prisma.link.findUnique({
     where: { id: linkId },
-    include: { tags: true, matters: true },
+    include: { tags: true, matters: true, space: true },
   });
   if (!link || link.userId !== userId) {
     throw ApiError.notFound('Link not found');
@@ -37,7 +37,7 @@ async function listLinks(userId, { spaceId, tag, source, cursor, limit = 20 } = 
     orderBy: { createdAt: 'desc' },
     take: take + 1,
     ...(cursor && { cursor: { id: cursor }, skip: 1 }),
-    include: { tags: true, matters: { orderBy: { createdAt: 'desc' }, take: 1 } },
+    include: { tags: true, space: true, matters: { orderBy: { createdAt: 'desc' }, take: 1 } },
   });
 
   const hasMore = links.length > take;
@@ -142,14 +142,24 @@ async function updateLink(userId, linkId, data) {
     tagIds = tags.map((t) => t.id);
   }
 
+  const domain = data.url ? extractDomain(data.url) : undefined;
+
   return prisma.link.update({
     where: { id: linkId },
     data: {
+      ...(data.url !== undefined && { url: data.url }),
+      ...(domain !== undefined && { domain }),
       ...(data.title !== undefined && { title: data.title }),
       ...(data.description !== undefined && { description: data.description }),
+      ...(data.faviconUrl !== undefined && { faviconUrl: data.faviconUrl }),
       ...(data.spaceId !== undefined && { spaceId: data.spaceId }),
       ...(data.thumbnailUrl !== undefined && { thumbnailUrl: data.thumbnailUrl }),
       ...(tagIds !== undefined && { tagIds }),
+    },
+    include: {
+      tags: true,
+      space: true,
+      matters: { orderBy: { createdAt: 'desc' }, take: 1 },
     },
   });
 }

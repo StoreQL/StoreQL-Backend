@@ -28,8 +28,10 @@ const createLinkSchema = z.object({
 });
 
 const updateLinkSchema = z.object({
+  url: z.string().trim().url('Must be a valid URL').optional(),
   title: z.string().trim().max(300).optional(),
   description: z.string().trim().max(1000).optional(),
+  faviconUrl: z.string().url().optional(),
   spaceId: z.string().trim().nullable().optional(),
   thumbnailUrl: z.string().url().optional(),
   tags: z.array(z.string().trim().min(1)).max(10).optional(),

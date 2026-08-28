@@ -4,7 +4,7 @@ const ApiError = require('../utils/ApiError');
 async function listSpaces(userId) {
   const spaces = await prisma.space.findMany({
     where: { userId },
-    orderBy: { order: 'asc' },
+    orderBy: { updatedAt: 'desc' },
   });
 
   // Attach lightweight counts (link/matter totals) for the Spaces grid.
@@ -39,6 +39,7 @@ async function createSpace(userId, data) {
       icon: data.icon || null,
       coverImageUrl: data.coverImageUrl || null,
       color: data.color || null,
+      category: data.category || 'General',
       order: count,
     },
   });
@@ -54,6 +55,7 @@ async function updateSpace(userId, spaceId, data) {
       ...(data.icon !== undefined && { icon: data.icon }),
       ...(data.coverImageUrl !== undefined && { coverImageUrl: data.coverImageUrl }),
       ...(data.color !== undefined && { color: data.color }),
+      ...(data.category !== undefined && { category: data.category }),
       ...(data.order !== undefined && { order: data.order }),
     },
   });
