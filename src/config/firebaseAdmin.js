@@ -4,26 +4,25 @@ const admin = require('firebase-admin');
 // a service account file. Private key needs newline un-escaping
 // since it's usually stored as a single-line env var.
 if (!admin.apps.length) {
-  const projectId = process.env.FIREBASE_PROJECT_ID;
+  const projectId = process.env.FIREBASE_PROJECT_ID || 'storeql-79d15';
   const clientEmail = process.env.FIREBASE_CLIENT_EMAIL;
   const privateKey = process.env.FIREBASE_PRIVATE_KEY
     ? process.env.FIREBASE_PRIVATE_KEY.replace(/\\n/g, '\n')
     : undefined;
 
-  if (!projectId || !clientEmail || !privateKey) {
-    console.warn(
-      '[firebaseAdmin] Missing Firebase Admin env vars. ' +
-        'Set FIREBASE_PROJECT_ID, FIREBASE_CLIENT_EMAIL, FIREBASE_PRIVATE_KEY in .env'
-    );
-  }
-
-  admin.initializeApp({
-    credential: admin.credential.cert({
+  if (projectId && clientEmail && privateKey) {
+    admin.initializeApp({
+      credential: admin.credential.cert({
+        projectId,
+        clientEmail,
+        privateKey,
+      }),
+    });
+  } else {
+    admin.initializeApp({
       projectId,
-      clientEmail,
-      privateKey,
-    }),
-  });
+    });
+  }
 }
 
 module.exports = admin;

@@ -3,21 +3,43 @@ const admin = require('../config/firebaseAdmin');
 const cloudinaryService = require('./cloudinaryService');
 
 async function findOrCreateByFirebaseUid({ firebaseUid, email, name, profileImageUrl }) {
-  const fallbackEmail = email || `${firebaseUid}@unknown.storeql`;
+  const normalizedEmail = email ? email.trim().toLowerCase() : null;
+  const fallbackEmail = normalizedEmail || `${firebaseUid}@unknown.storeql`;
 
   try {
-    const existing = await prisma.user.findUnique({ where: { firebaseUid } });
+    // 1. Search by firebaseUid
+    let existing = await prisma.user.findUnique({ where: { firebaseUid } });
+
+    // 2. If not found by firebaseUid, search by email (case-insensitive)
+    if (!existing && normalizedEmail) {
+      existing = await prisma.user.findFirst({
+        where: {
+          email: { equals: normalizedEmail, mode: 'insensitive' },
+        },
+      });
+
+      if (existing) {
+        existing = await prisma.user.update({
+          where: { id: existing.id },
+          data: {
+            firebaseUid,
+            ...(name && (!existing.name || existing.name === 'StoreQL User') ? { name } : {}),
+            ...(profileImageUrl && !existing.profileImageUrl ? { profileImageUrl } : {}),
+          },
+        });
+        return existing;
+      }
+    }
 
     if (existing) {
-      // Only set profileImageUrl if the existing user has no photo yet and provider offers one
       const shouldSetPhoto = !existing.profileImageUrl && profileImageUrl;
       const shouldSetName = (!existing.name || existing.name === 'StoreQL User') && name;
 
-      if (shouldSetPhoto || shouldSetName || (email && existing.email !== email)) {
+      if (shouldSetPhoto || shouldSetName || (normalizedEmail && existing.email !== normalizedEmail)) {
         return await prisma.user.update({
           where: { id: existing.id },
           data: {
-            ...(email && { email }),
+            ...(normalizedEmail && { email: normalizedEmail }),
             ...(shouldSetName && { name }),
             ...(shouldSetPhoto && { profileImageUrl }),
           },
@@ -26,6 +48,7 @@ async function findOrCreateByFirebaseUid({ firebaseUid, email, name, profileImag
       return existing;
     }
 
+    // 3. User does not exist, create
     return await prisma.user.create({
       data: {
         firebaseUid,
@@ -36,8 +59,20 @@ async function findOrCreateByFirebaseUid({ firebaseUid, email, name, profileImag
     });
   } catch (err) {
     if (err.code === 'P2002') {
-      const existing = await prisma.user.findUnique({ where: { firebaseUid } });
-      if (existing) return existing;
+      const existingByUid = await prisma.user.findUnique({ where: { firebaseUid } });
+      if (existingByUid) return existingByUid;
+
+      if (normalizedEmail) {
+        const existingByEmail = await prisma.user.findFirst({
+          where: { email: { equals: normalizedEmail, mode: 'insensitive' } },
+        });
+        if (existingByEmail) {
+          return await prisma.user.update({
+            where: { id: existingByEmail.id },
+            data: { firebaseUid },
+          });
+        }
+      }
     }
     throw err;
   }
@@ -89,5 +124,3 @@ async function deleteUserAccount(userId, firebaseUid) {
 }
 
 module.exports = { findOrCreateByFirebaseUid, updateProfile, deleteUserAccount };
-
-
