@@ -11,6 +11,7 @@
     "prisma:studio": "prisma studio"
   },
   "dependencies": {
+    "@clerk/express": "^2.1.64",
     "@prisma/client": "^5.20.0",
     "cheerio": "^1.0.0",
     "cloudinary": "^2.5.1",
@@ -18,7 +19,6 @@
     "dotenv": "^16.4.5",
     "express": "^4.21.1",
     "express-rate-limit": "^7.4.1",
-    "firebase-admin": "^12.6.0",
     "helmet": "^8.0.0",
     "morgan": "^1.10.0",
     "multer": "^1.4.5-lts.1",

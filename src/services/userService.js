@@ -1,12 +1,30 @@
 const prisma = require('../config/prismaClient');
-const admin = require('../config/firebaseAdmin');
+const { clerkClient } = require('../config/clerk');
 const cloudinaryService = require('./cloudinaryService');
 
-async function findOrCreateByFirebaseUid({ firebaseUid, email, name, profileImageUrl }) {
-  const fallbackEmail = email || `${firebaseUid}@unknown.storeql`;
+async function findOrCreateByClerkId({ clerkId, email, name, profileImageUrl }) {
+  const fallbackEmail = email || `${clerkId}@unknown.storeql`;
 
   try {
-    const existing = await prisma.user.findUnique({ where: { firebaseUid } });
+    // 1. Check if user exists by clerkId
+    let existing = await prisma.user.findUnique({ where: { clerkId } });
+
+    // 2. If not found by clerkId, check if existing user has this email (migrating from previous auth)
+    if (!existing && email) {
+      existing = await prisma.user.findUnique({ where: { email } });
+      if (existing) {
+        // Link existing user record to new clerkId
+        existing = await prisma.user.update({
+          where: { id: existing.id },
+          data: {
+            clerkId,
+            ...(name && (!existing.name || existing.name === 'StoreQL User') ? { name } : {}),
+            ...(profileImageUrl && !existing.profileImageUrl ? { profileImageUrl } : {}),
+          },
+        });
+        return existing;
+      }
+    }
 
     if (existing) {
       // Only set profileImageUrl if the existing user has no photo yet and provider offers one
@@ -28,7 +46,7 @@ async function findOrCreateByFirebaseUid({ firebaseUid, email, name, profileImag
 
     return await prisma.user.create({
       data: {
-        firebaseUid,
+        clerkId,
         email: fallbackEmail,
         name: name || null,
         profileImageUrl: profileImageUrl || null,
@@ -36,8 +54,18 @@ async function findOrCreateByFirebaseUid({ firebaseUid, email, name, profileImag
     });
   } catch (err) {
     if (err.code === 'P2002') {
-      const existing = await prisma.user.findUnique({ where: { firebaseUid } });
-      if (existing) return existing;
+      const existingByClerk = await prisma.user.findUnique({ where: { clerkId } });
+      if (existingByClerk) return existingByClerk;
+
+      if (email) {
+        const existingByEmail = await prisma.user.findUnique({ where: { email } });
+        if (existingByEmail) {
+          return await prisma.user.update({
+            where: { id: existingByEmail.id },
+            data: { clerkId },
+          });
+        }
+      }
     }
     throw err;
   }
@@ -53,7 +81,7 @@ async function updateProfile(userId, { name, profileImageUrl }) {
   });
 }
 
-async function deleteUserAccount(userId, firebaseUid) {
+async function deleteUserAccount(userId, clerkId) {
   // 0. Clean up Cloudinary folder & images if any exist
   try {
     const user = await prisma.user.findUnique({ where: { id: userId } });
@@ -76,18 +104,16 @@ async function deleteUserAccount(userId, firebaseUid) {
   await prisma.tag.deleteMany({ where: { userId } });
   await prisma.user.delete({ where: { id: userId } });
 
-  // 2. Delete user from Firebase Auth if admin is configured
-  if (firebaseUid && admin.apps?.length) {
+  // 2. Delete user from Clerk Auth if clerkId provided
+  if (clerkId) {
     try {
-      await admin.auth().deleteUser(firebaseUid);
-    } catch (firebaseErr) {
-      console.warn('[deleteUserAccount] Firebase deleteUser note:', firebaseErr.message);
+      await clerkClient.users.deleteUser(clerkId);
+    } catch (clerkErr) {
+      console.warn('[deleteUserAccount] Clerk deleteUser note:', clerkErr.message);
     }
   }
 
   return { success: true };
 }
 
-module.exports = { findOrCreateByFirebaseUid, updateProfile, deleteUserAccount };
-
-
+module.exports = { findOrCreateByClerkId, updateProfile, deleteUserAccount };

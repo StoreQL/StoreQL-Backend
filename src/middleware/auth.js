@@ -1,39 +1,54 @@
-const admin = require('../config/firebaseAdmin');
+const { getAuth } = require('@clerk/express');
+const { clerkClient } = require('../config/clerk');
 const userService = require('../services/userService');
 const ApiError = require('../utils/ApiError');
 const asyncHandler = require('../utils/asyncHandler');
 
 /**
- * Verifies the Firebase ID token on every protected request, then
+ * Verifies the Clerk session/token on every protected request, then
  * attaches the corresponding MongoDB user to req.user.
  *
  * The frontend NEVER sends a user id — ownership is always derived
  * from this verified token, never from the request body.
  */
 const requireAuth = asyncHandler(async (req, res, next) => {
-  const header = req.headers.authorization || '';
-  const [scheme, token] = header.split(' ');
+  const auth = getAuth(req);
+  const userId = auth?.userId || req.auth?.userId;
 
-  if (scheme !== 'Bearer' || !token) {
-    throw ApiError.unauthorized('Missing or malformed Authorization header');
-  }
-
-  let decoded;
-  try {
-    decoded = await admin.auth().verifyIdToken(token);
-  } catch (err) {
+  if (!userId) {
     throw ApiError.unauthorized('Invalid or expired session. Please sign in again.');
   }
 
-  const user = await userService.findOrCreateByFirebaseUid({
-    firebaseUid: decoded.uid,
-    email: decoded.email,
-    name: decoded.name,
-    profileImageUrl: decoded.picture || decoded.photoURL || null,
+  let email = null;
+  let name = null;
+  let profileImageUrl = null;
+
+  try {
+    const clerkUser = await clerkClient.users.getUser(userId);
+    if (clerkUser) {
+      email =
+        clerkUser.emailAddresses?.find((e) => e.id === clerkUser.primaryEmailAddressId)?.emailAddress ||
+        clerkUser.emailAddresses?.[0]?.emailAddress ||
+        null;
+      name =
+        [clerkUser.firstName, clerkUser.lastName].filter(Boolean).join(' ') ||
+        clerkUser.username ||
+        null;
+      profileImageUrl = clerkUser.imageUrl || null;
+    }
+  } catch (userFetchErr) {
+    console.warn('[requireAuth] Clerk getUser note:', userFetchErr.message);
+  }
+
+  const user = await userService.findOrCreateByClerkId({
+    clerkId: userId,
+    email,
+    name,
+    profileImageUrl,
   });
 
   req.user = user;
-  req.firebaseUid = decoded.uid;
+  req.clerkId = userId;
   next();
 });
 

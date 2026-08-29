@@ -1,8 +1,7 @@
 const userService = require('../services/userService');
 const asyncHandler = require('../utils/asyncHandler');
-const ApiError = require('../utils/ApiError');
 
-// Called once after Firebase sign-in/sign-up so the mobile app can
+// Called once after Clerk sign-in/sign-up so the mobile app can
 // confirm the MongoDB user record exists and fetch its profile.
 // requireAuth middleware already did the find-or-create.
 const sync = asyncHandler(async (req, res) => {
@@ -21,9 +20,8 @@ const updateProfile = asyncHandler(async (req, res) => {
 
 // DELETE /api/auth/account
 const deleteAccount = asyncHandler(async (req, res) => {
-  await userService.deleteUserAccount(req.user.id, req.firebaseUid);
+  await userService.deleteUserAccount(req.user.id, req.clerkId);
   res.json({ message: 'Account and all associated data permanently deleted' });
 });
 
 module.exports = { sync, updateProfile, deleteAccount };
-

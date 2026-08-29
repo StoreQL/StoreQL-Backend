@@ -33,7 +33,7 @@ cp .env.example .env
 ```
 Then paste in:
 - `MONGODB_URL` — your MongoDB Atlas (or local) connection string
-- `FIREBASE_PROJECT_ID`, `FIREBASE_CLIENT_EMAIL`, `FIREBASE_PRIVATE_KEY` — from your Firebase service account JSON (Project Settings → Service Accounts → Generate new private key)
+- `CLERK_PUBLISHABLE_KEY` & `CLERK_SECRET_KEY` — from your Clerk Dashboard (API Keys)
 - `CLOUDINARY_CLOUD_NAME`, `CLOUDINARY_API_KEY`, `CLOUDINARY_API_SECRET` — from your Cloudinary dashboard
 
 ## 3. Push the Prisma schema to MongoDB
@@ -51,9 +51,9 @@ Health check: `GET http://localhost:4000/api/health`
 ## Authenticating requests
 Every protected endpoint expects:
 ```
-Authorization: Bearer <firebase_id_token>
+Authorization: Bearer <clerk_session_token>
 ```
-The `requireAuth` middleware verifies this with Firebase Admin, then finds-or-creates the matching MongoDB user and attaches it as `req.user`. Ownership is always derived from the verified token — the client never sends a user id that's trusted for authorization.
+The `requireAuth` middleware verifies this with Clerk, then finds-or-creates the matching MongoDB user and attaches it as `req.user`. Ownership is always derived from the verified token — the client never sends a user id that's trusted for authorization.
 
 ## Key endpoints
 ```
